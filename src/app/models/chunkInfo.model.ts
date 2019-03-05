@@ -6,4 +6,6 @@ export class ChunkInfo {
     url: string;
     response: any;
     result: boolean = false;
+    loadedInFS:boolean = false;
+    isWorkder:boolean = false;
 }

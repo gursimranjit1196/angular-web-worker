@@ -1,17 +1,36 @@
 window=this;
 
 onmessage = async function(e) {
-    let chunkInfoObj = e.data
-    let urlResponse = await getDataFromURL(chunkInfoObj)
-    chunkInfoObj.response = urlResponse
-    chunkInfoObj.name = window.document === undefined ? "true" : "false"
+    let obj = e.data
 
-    postMessage(chunkInfoObj)
+    if (obj.task = "DownloadChunk") {
+        let urlResponse = await getDataFromURL(obj, "blob")
+        obj.response = urlResponse
+        obj.isWorkder = window.document === undefined
+        postMessage(obj)
+    } else if (obj.task = "DownloadEncKey") {
+        let urlResponse = await getDataFromURL(obj, "blob")
+        console.log(urlResponse)
+        obj.response = urlResponse
+        postMessage(obj)
+    }
+    
 }
   
-async function getDataFromURL(obj) {
-    let response = await fetch(obj.url)
-    return "RESPONSE DATA: " + obj.id
+async function getDataFromURL(obj, type) {
+    return new Promise((res, rej) => {
+
+        var xhr = new XMLHttpRequest()
+        xhr.onreadystatechange = function(){
+            if (xhr.readyState == 4 && xhr.status == 200) {
+                res(xhr.response)
+            }
+        }
+        xhr.open("get", obj.url, true)
+        xhr.responseType = type
+        xhr.send()
+
+    })
 }
 
 // async function getDataFromURL(obj) {

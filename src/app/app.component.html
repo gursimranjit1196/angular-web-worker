@@ -13,6 +13,7 @@
     <div *ngIf = "workerResponse && workerResponse[1] && workerResponse[1].length">
       <!-- <p *ngFor = "let chunkInfo of workerResponse[1]">{{ chunkInfo.result ? 'DONE' : 'PRROCESSING...' }}</p> -->
       <p>{{ getDownloadPercentage(1) }}</p>
+      <video *ngIf="getDownloadPercentage(1) == 100" id="my_video_1" class="video-js vjs-default-skin" controls preload="auto" width="640" height="268" data-setup='{}'> <source [src] = getVideoSrc(1) type="video/mp4"> </video>
     </div>
   </li>
 
