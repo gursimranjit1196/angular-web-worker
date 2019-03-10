@@ -8,28 +8,33 @@
 </div>
 
 <ul>
-  <li>
-    <h2><a rel="noopener" (click) = "downloadVideoWithWorker(1)">DOWNLOAD VIDEO 1 WITH WORKER</a></h2>
-    <div *ngIf = "workerResponse && workerResponse[1] && workerResponse[1].length">
-      <!-- <p *ngFor = "let chunkInfo of workerResponse[1]">{{ chunkInfo.result ? 'DONE' : 'PRROCESSING...' }}</p> -->
-      <p>{{ getDownloadPercentage(1) }}</p>
-      <video *ngIf="getDownloadPercentage(1) == 100" id="my_video_1" class="video-js vjs-default-skin" controls preload="auto" width="640" height="268" data-setup='{}'> <source [src] = getVideoSrc(1) type="video/mp4"> </video>
+  <li *ngFor = "let asset of assetList">
+    <div *ngIf = "!assetDetails[asset] || (assetDetails[asset] && (assetDetails[asset].res === 'IN_PROGRESS' || assetDetails[asset].res === 'FAILURE'))">
+      <h2>
+          DOWNLOAD COMPLETE VIDEO {{ asset }} ({{ assetListObj[asset].size / (1024 * 1024 * 1024) }})
+      </h2>
+      <button type="button" (click) = "downloadCompleteVideoWithWorker(asset)" [disabled] = "assetDetails[asset] && (assetDetails[asset].res === 'IN_PROGRESS' || assetDetails[asset].res === 'SUCCESS')">Download</button>
+      <h3 *ngIf = "assetDetails[asset] && assetDetails[asset].res === 'IN_PROGRESS'">DOWNLOADING...({{ assetDetails[asset] && assetDetails[asset].lastChunkWritten && assetDetails[asset].totalChunks && (assetDetails[asset].lastChunkWritten * 100) / assetDetails[asset].totalChunks }} %)</h3>
+      <h3 *ngIf = "assetDetails[asset] && assetDetails[asset].res === 'SUCCESS'">DOWNLOADED</h3>
+      <h3 *ngIf = "assetDetails[asset] && assetDetails[asset].res === 'FAILURE'">FAILED</h3>
+      <h3 *ngIf = "assetDetails[asset] === true">ALREADY DOWLOADED</h3>
+      <button type="button" (click) = "onPlayClick(asset)" *ngIf="assetDetails[asset] && assetDetails[asset].res === 'SUCCESS'">PLAY</button>
+      <button type="button" (click) = "downloadCompleteVideoWithWorker(asset)" *ngIf="assetDetails[asset] == false">DOWNLOAD AGAIN</button>
+      <div class="" #videoTag [id] = "asset"></div>
     </div>
   </li>
+</ul>
 
-  <li>
-    <h2><a rel="noopener" (click) = "downloadVideoWithWorker(2)">DOWNLOAD VIDEO 2 WITH WORKER</a></h2>
-    <div *ngIf = "workerResponse && workerResponse[2] && workerResponse[2].length">
-      <!-- <p *ngFor = "let chunkInfo of workerResponse[2]">{{ chunkInfo.result ? 'DONE' : 'PRROCESSING...' }}</p> -->
-      <p>{{ getDownloadPercentage(2) }}</p>
-    </div>
-  </li>
+<h3>DOWNLOADED LIST</h3>
 
-  <li>
-    <h2><a rel="noopener" (click) = "downloadVideoWithWorker(3)">DOWNLOAD VIDEO 3 WITH WORKER</a></h2>
-    <div *ngIf = "workerResponse && workerResponse[3] && workerResponse[3].length">
-      <!-- <p *ngFor = "let chunkInfo of workerResponse[3]">{{ chunkInfo.result ? 'DONE' : 'PRROCESSING...' }}</p> -->
-      <p>{{ getDownloadPercentage(3) }}</p>
+<ul>
+  <li *ngFor = "let asset of assetList">
+    <div *ngIf = "(assetDetails[asset] && assetDetails[asset].res === 'SUCCESS')">
+      <h2>
+          DOWNLOAD COMPLETE VIDEO {{ asset }} ({{ assetListObj[asset].size / (1024 * 1024 * 1024) }})
+      </h2>
+      <button type="button" (click) = "onPlayClick(asset)" *ngIf="assetDetails[asset] && assetDetails[asset].res === 'SUCCESS'">PLAY</button>
+      <div class="" #videoTag [id] = "asset"></div>
     </div>
   </li>
 </ul>

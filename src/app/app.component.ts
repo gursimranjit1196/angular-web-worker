@@ -1,9 +1,8 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ElementRef, ViewChild, ViewChildren, QueryList } from '@angular/core';
 
 import { AppService } from './services/app.service';
-import { environment } from 'src/environments/environment';
 
-import { DomSanitizer } from '@angular/platform-browser';
+// import { DomSanitizer } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-root',
@@ -12,44 +11,38 @@ import { DomSanitizer } from '@angular/platform-browser';
 })
 export class AppComponent implements OnInit {
 
-  public workerResponse = this._appService.workerResponse
   public appBaseUrl
+  public assetDetails: object = this._appService.assetDetails
+  public assetListObj = this._appService.assetListObj
+  public assetList = Object.keys(this.assetListObj)
+
+  @ViewChildren("videoTag") videoTags: QueryList<any>
 
   constructor(
-    private _appService: AppService,
-    private _sanitizer:DomSanitizer
+    private _appService: AppService
   ) {}
 
-  ngOnInit() {
-    console.log(this.workerResponse)
-    this.setAppBaseUrl()
+  async ngOnInit() {
+    await this.setAppBaseUrl()
+    this._appService.setAssetDetails()
   }
 
   async setAppBaseUrl() {
     this.appBaseUrl = await this._appService.getExtBaseUrl()
-    this.appBaseUrl = this.appBaseUrl.replace("filesystem:", "")
   }
 
-  downloadVideoWithWorker(asset_id: number) {
-    this._appService.downloadVideoWithWorker(asset_id)
+  downloadCompleteVideoWithWorker(asset_id: number) {
+    this._appService.downloadCompleteVideoWithWorker(asset_id)
   }
 
-  getDownloadPercentage(asset_id: number) {
-    let chunksArr = this.workerResponse[asset_id];
-    return ((chunksArr.filter(c => c.result).length) / chunksArr.length) * 100
-  }
-
-  getVideoSrc(asset_id: number) {
-    let dirPath = `${ environment.production ? "PROD" : "DEV" }/${ asset_id }` 
-    let filePath = `${dirPath}/chunks_index.m3u8`
-    let extBaseUrl = this.appBaseUrl
-    if (extBaseUrl && extBaseUrl.length) {
-      let res = this._sanitizer.bypassSecurityTrustUrl(`${extBaseUrl}${filePath}`)
-      console.log("Video URL: ", res)
-      return res
-    } else {
-      return ""
-    }
+  onPlayClick(asset_id) {
+    let assetUrl = `${this.appBaseUrl}${asset_id}.mp4#t=0`
+    let tag = "<video class='video-fit' controls> <source src=" + assetUrl + " type='video/mp4'></video>"
+    this.videoTags.forEach((videoTag) => {
+      if (videoTag.nativeElement.id == asset_id) {
+        videoTag.nativeElement.insertAdjacentHTML('beforeend', tag)
+      }
+    })
   }
 
 }

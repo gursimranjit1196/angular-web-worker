@@ -1,83 +1,15 @@
-import { Subject } from 'rxjs';
-
-import { VIDEO_URLS, ENC_KEY_URL } from "../constants/videoURL";
-
-import { ChunkInfo } from '../models/chunkInfo.model';
+import { ASSET_LIST_OBJ } from "../constants/videoURL";
 import { environment } from 'src/environments/environment';
+
+declare var _CHROME: any;
 
 export class AppService {
 
-    private _workerResponse = {}
+    public assetDetails = {}
+    private _assetListObj = ASSET_LIST_OBJ
 
-    get workerResponse() {
-        return this._workerResponse
-    }
-
-    downloadVideoWithWorker(asset_id) {
-        
-        if (VIDEO_URLS[asset_id] && VIDEO_URLS[asset_id].length) {
-            let chunkInfoArr:ChunkInfo[] = []
-            this._workerResponse[asset_id] = chunkInfoArr
-            VIDEO_URLS[asset_id].forEach((url, i) => {
-
-                let chunkInfoObj = new ChunkInfo()
-                chunkInfoObj.id = i + 1
-                chunkInfoObj.asset_id = asset_id
-                chunkInfoObj.url = url
-                chunkInfoObj.name = url.substring(url.lastIndexOf("/") + 1)
-                chunkInfoArr.push(chunkInfoObj)
-
-                this.getDataFromWorker(asset_id, chunkInfoObj)
-
-            });
-        }
-    }
-
-    getDataFromWorker(asset_id, chunkInfoObj) {
-        let worker = new Worker("assets/worker.js")
-
-        worker.postMessage({ ...chunkInfoObj, task: "DownloadChunk" });
-
-        worker.onmessage = (response) => {
-            let res: ChunkInfo = response.data
-            chunkInfoObj.response = res.response
-            chunkInfoObj.result = true
-            chunkInfoObj.isWorkder = res.isWorkder
-            worker.terminate()
-            this.saveDataToExt(chunkInfoObj)
-        }
-    }
-
-
-    async saveDataToExt(chunkInfoObj: ChunkInfo) {
-        
-        let rfs = window["requestFileSystem"] || window["webkitRequestFileSystem"]
-        rfs["directoryEntry"] = window["directoryEntry"] || window["directoryEntry"]
-
-        rfs(window["PERSISTENT"], 1024*1024, async (fs) => {
-
-            let dirPath = `${ environment.production ? "PROD" : "DEV" }/${ chunkInfoObj.asset_id }`            
-
-            let dirPathRes = await this.createDirPath(fs.root, dirPath.split('/'), false)
-
-            let filePath = `${dirPath}/${chunkInfoObj.name}`
-
-            fs.root.getFile(filePath, { create: true }, 
-                async (fileEntry) => {
-                    let fileResponse = await this.writeInFile(fileEntry, chunkInfoObj)
-
-                    fs.root.getFile(filePath, { create: false }, function() {
-                        console.log("FILE FOUND", filePath) 
-                        fileEntry.getMetadata(function(metadata) { console.log("METADETA", metadata) })
-                    }, function() { console.log("FILE NOT FOUND AFTER WRITE", filePath) })
-
-                }, 
-                function () {
-                    console.log("ERROR IN CREATING CHUNK FILE")
-                }
-            )
-
-        }, function () {});
+    get assetListObj() {
+        return this._assetListObj
     }
 
 
@@ -100,32 +32,6 @@ export class AppService {
         })
     }
 
-    async writeInFile(fileEntry, chunkInfoObj, type = "video\/mp4") {
-        return new Promise((res, rej) => {
-
-            fileEntry.createWriter(
-                (fileWriter) => {
-
-                    fileWriter.onwriteend = function(e) { res(true) }
-          
-                    fileWriter.onerror = function(e) {
-                        console.log('Write failed: ' + e.toString())
-                        rej(false)
-                    }
-          
-                    // Create a new Blob and write it to log.txt.
-                    var blob = new Blob([chunkInfoObj.response], { type });
-                    fileWriter.write(blob)
-
-                },
-                (err) => {
-                    console.log("ERROR WHILE WRITING DATA IN FILE")
-                    rej(false)
-                }
-            )
-
-        })
-    }
 
     async getExtBaseUrl() {
         return new Promise((res, rej) => {
@@ -141,59 +47,70 @@ export class AppService {
         })
     }
 
-    async setEncFile() {
 
-        let encFile = await this.getEncFileFromWorker()
+    async downloadCompleteVideoWithWorker(asset_id) {
 
-        this.setEncFileInFS(encFile)
+        let worker = new Worker("assets/completeVideoWorker.js")
+        
+        let localStorageData = null
 
-    }
+        if (environment.production && false) {
+            localStorageData = await this.getDataFromChromeStorage(asset_id.toString())
+        } else {
+            try { localStorageData = JSON.parse(localStorage.getItem(asset_id)) } catch (e) { localStorageData = null }
+        }
 
-    setEncFileInFS(encFile) {
+        worker.postMessage({ ...this._assetListObj[asset_id], isNew: !localStorageData, lastChunkWritten: localStorageData ? localStorageData.lastChunkWritten : 0 })
 
-        let rfs = window["requestFileSystem"] || window["webkitRequestFileSystem"]
-        rfs["directoryEntry"] = window["directoryEntry"] || window["directoryEntry"]
+        worker.onmessage = async (response) => {
+            if (response.data && response.data.res === "IN_PROGRESS") {
+                this.assetDetails[asset_id] = response.data
+            } else if (response.data && response.data.res === "SUCCESS") {
 
-        rfs(window["PERSISTENT"], 1024*1024, async (fs) => {
+                this.assetDetails[asset_id] = response.data
+                localStorage.setItem(asset_id, JSON.stringify(response.data))
+                worker.terminate()
 
-            let dirPath = `${ environment.production ? "PROD" : "DEV" }`          
+            } else if (response.data && response.data.res === "FAILURE") {
 
-            let dirPathRes = await this.createDirPath(fs.root, dirPath.split('/'), false)
+                console.log("IN FAILURE........")
+                this.assetDetails[asset_id] = response.data
+                localStorage.setItem(asset_id, JSON.stringify(response.data))
+                worker.terminate()
 
-            let filePath = `${dirPath}/hello.txt`
-
-            console.log(filePath)
-
-            fs.root.getFile(filePath, { create: true }, 
-                async (fileEntry) => {
-                    let fileResponse = await this.writeInFile(fileEntry, { response: encFile }, "text/plain")
-
-                    fs.root.getFile(filePath, { create: false }, function() { 
-                        console.log("FILE FOUND", filePath) 
-                        fileEntry.getMetadata(function(metadata) { console.log("METADETA", metadata) })
-                    }, function() { console.log("FILE NOT FOUND AFTER WRITE", filePath) })
-
-                }, 
-                function () {
-                    console.log("ERROR IN CREATING CHUNK FILE")
-                }
-            )
-
-        }, function () {});
-    }
-
-    getEncFileFromWorker() {
-        return new Promise((res, rej) => {
-
-            let worker = new Worker("assets/worker.js")
-
-            worker.postMessage({ url: ENC_KEY_URL, task: "DownloadEncKey" });
-
-            worker.onmessage = (response) => {
-                res(response["response"])
             }
+        }
+    }
 
+
+
+
+    // STORAGE SERVICES
+
+    async getDataFromChromeStorage(k = "ASSET_DETAILS") {
+        return new Promise((res, rej) => {
+            _CHROME.storage.local.get([k], function(result) {
+                res(result.key)
+            })
         })
+    }
+
+    async setDataInChromeStorage(k, v) {
+        return new Promise((res, rej) => {
+            _CHROME.storage.local.set({ k: v }, function() { 
+                res(true)
+            })
+        })
+    }
+
+    setAssetDetails() {
+        for(let i = 1; i <= Object.keys(this._assetListObj).length; i++) {
+            try { this.assetDetails[i] = localStorage.getItem(i.toString()) } catch (error) { }
+        }
+    }
+
+    setDataInStorage(k, v) {
+        localStorage.setItem(k, JSON.stringify(v))
     }
     
 

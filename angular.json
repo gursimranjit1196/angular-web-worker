@@ -27,7 +27,8 @@
             ],
             "scripts": [
               "src/assets/js/video.js",
-              "src/assets/js/videojs-contrib-hls.js"
+              "src/assets/js/videojs-contrib-hls.js",
+              "src/assets/js/custom.js"
             ]
           },
           "configurations": {
